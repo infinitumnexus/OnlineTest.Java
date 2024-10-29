@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Quiz Platform</title>
+    <style>
+        /* CSS Styling */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+        .options button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            border: none;
+            transition: background-color 0.3s;
+        }
+
+        .options button.correct {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .options button.incorrect {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .result {
+            font-size: 1.5em;
+            color: #333;
+        }
+
+        #scoreHistoryList {
+            list-style: none;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Quiz Platform</h1>
+        
+        <!-- Category Selection Section -->
+        <div id="categorySection">
+            <h2>Select Quiz Category</h2>
+            <select id="categorySelect">
+                <option value="general">General Knowledge</option>
+                <option value="science">Science</option>
+                <option value="history">History</option>
+            </select>
+            <button onclick="startQuiz()">Start Quiz</button>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quizSection" style="display: none;">
+            <p class="question" id="questionText">Loading question...</p>
+            <div class="options" id="optionsContainer"></div>
+            <p id="timer">Time Left: <span id="timeLeft">15</span>s</p>
+        </div>
+
+        <!-- Result Section -->
+        <div id="resultSection" style="display: none;">
+            <p class="result">Your Score: <span id="score"></span> out of <span id="totalQuestions"></span></p>
+            <button onclick="showCategorySelection()">Try Again</button>
+        </div>
+
+        <!-- Score History Section -->
+        <div id="scoreHistorySection">
+            <h2>Score History</h2>
+            <ul id="scoreHistoryList"></ul>
+        </div>
+    </div>
+
+    <script>
+        // Sample questions categorized by type
+        const quizData = {
+            general: [
+                { question: "What is the capital of France?", options: ["Berlin", "London", "Paris", "Madrid"], answer: "Paris" },
+                { question: "What is the largest mammal?", options: ["Elephant", "Blue Whale", "Shark", "Giraffe"], answer: "Blue Whale" }
+            ],
+            science: [
+                { question: "What is the chemical symbol for water?", options: ["H2O", "CO2", "O2", "He"], answer: "H2O" },
+                { question: "What planet is known as the Red Planet?", options: ["Mars", "Jupiter", "Earth", "Saturn"], answer: "Mars" }
+            ],
+            history: [
+                { question: "Who was the first president of the United States?", options: ["Thomas Jefferson", "Abraham Lincoln", "George Washington", "John Adams"], answer: "George Washington" },
+                { question: "What year did World War II end?", options: ["1945", "1939", "1918", "1963"], answer: "1945" }
+            ]
+        };
+
+        let selectedCategory = "general";
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let timer;
+        let timeLeft = 15;
+        let questions = [];
+
+        // DOM Elements
+        const questionText = document.getElementById('questionText');
+        const optionsContainer = document.getElementById('optionsContainer');
+        const timerText = document.getElementById('timeLeft');
+        const quizSection = document.getElementById('quizSection');
+        const resultSection = document.getElementById('resultSection');
+        const scoreDisplay = document.getElementById('score');
+        const totalQuestionsDisplay = document.getElementById('totalQuestions');
+        const scoreHistoryList = document.getElementById('scoreHistoryList');
+        const categorySelect = document.getElementById('categorySelect');
+
+        // Load previous scores from LocalStorage
+        function loadScoreHistory() {
+            const scoreHistory = JSON.parse(localStorage.getItem('scoreHistory')) || [];
+            scoreHistoryList.innerHTML = "";
+            scoreHistory.forEach((score) => {
+                const li = document.createElement('li');
+                li.textContent = `Category: ${score.category}, Score: ${score.score} / ${score.total}`;
+                scoreHistoryList.appendChild(li);
+            });
+        }
+
+        // Save score to LocalStorage
+        function saveScoreHistory(category, score, total) {
+            const scoreHistory = JSON.parse(localStorage.getItem('scoreHistory')) || [];
+            scoreHistory.push({ category, score, total });
+            localStorage.setItem('scoreHistory', JSON.stringify(scoreHistory));
+            loadScoreHistory();
+        }
+
+        // Start Quiz
+        function startQuiz() {
+            score = 0;
+            currentQuestionIndex = 0;
+            selectedCategory = categorySelect.value;
+            questions = quizData[selectedCategory];
+            totalQuestionsDisplay.textContent = questions.length;
+            timeLeft = 15;
+            quizSection.style.display = 'block';
+            resultSection.style.display = 'none';
+            loadQuestion();
+        }
+
+        // Load question and options
+        function loadQuestion() {
+            clearInterval(timer);
+            if (currentQuestionIndex >= questions.length) {
+                endQuiz();
+                return;
+            }
+
+            const currentQuestion = questions[currentQuestionIndex];
+            questionText.textContent = currentQuestion.question;
+            optionsContainer.innerHTML = '';
+
+            currentQuestion.options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.onclick = () => checkAnswer(button, option);
+                optionsContainer.appendChild(button);
+            });
+
+            timerText.textContent = timeLeft;
+            timer = setInterval(() => {
+                timeLeft--;
+                timerText.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    checkAnswer(null, null); // Auto-check when time is up
+                }
+            }, 1000);
+        }
+
+        // Check answer
+        function checkAnswer(button, selectedOption) {
+            clearInterval(timer);
+            const currentQuestion = questions[currentQuestionIndex];
+            if (selectedOption === currentQuestion.answer) {
+                score++;
+                if (button) button.classList.add('correct');
+            } else {
+                if (button) button.classList.add('incorrect');
+            }
+            currentQuestionIndex++;
+            setTimeout(loadQuestion, 1000);
+        }
+
+        // End Quiz
+        function endQuiz() {
+            quizSection.style.display = 'none';
+            resultSection.style.display = 'block';
+            scoreDisplay.textContent = score;
+            saveScoreHistory(selectedCategory, score, questions.length);
+        }
+
+        // Show Category Selection
+        function showCategorySelection() {
+            quizSection.style.display = 'none';
+            resultSection.style.display = 'none';
+            loadScoreHistory();
+        }
+
+        showCategorySelection();
+    </script>
+</body>
+</html>
